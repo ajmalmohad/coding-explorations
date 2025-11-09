@@ -55,7 +55,7 @@ def test_rebalance_on_addition_moves_items():
     m.add_node("NodeB")
     # After rebalance, each id should be stored on the node that maps to it
     for k in ids:
-        expected_node = m._find_closest_next_node_for_key(k)
+        expected_node = m._find_closest_next_node_for_hash(m._hash(k))
         stored_ids = set(read_ids_for_node(expected_node))
         assert k in stored_ids, f"{k} not found in expected node {expected_node}"
 
@@ -74,7 +74,7 @@ def test_rebalance_on_removal_moves_items_and_deletes_file():
     assert not os.path.exists("NodeB.csv")
 
     for k in ids:
-        expected = m._find_closest_next_node_for_key(k)
+        expected = m._find_closest_next_node_for_hash(m._hash(k))
         stored_ids = set(read_ids_for_node(expected))
         assert k in stored_ids, f"{k} missing from {expected}"
 

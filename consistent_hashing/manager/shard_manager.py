@@ -89,13 +89,8 @@ class ShardManager:
         self.logger.debug("Hash %s -> nearest node %s (hash %s)", hash, nearest_node, nearest_node_hash)
         return nearest_node
 
-    def _find_closest_next_node_for_key(self, query_key: str):
-        query_hash = self._hash(query_key)
-        self.logger.debug("Key '%s' hashed to %s", query_key, query_hash)
-        return self._find_closest_next_node_for_hash(query_hash)
-
     def get_data(self, id: str):
-        node_name = self._find_closest_next_node_for_key(id)
+        node_name = self._find_closest_next_node_for_hash(self._hash(id))
         self.logger.debug("get_data: id=%s mapped to node=%s", id, node_name)
         return self.data_store.get_by_id_from_node(id, node_name)
 
@@ -104,12 +99,12 @@ class ShardManager:
             raise ValueError(f"Data length {len(data)} does not match schema length {len(schema)}.")
         
         id = data[0]
-        node_name = self._find_closest_next_node_for_key(id)
+        node_name = self._find_closest_next_node_for_hash(self._hash(id))
         self.logger.debug("insert_data: id=%s will go to node=%s", id, node_name)
         self.data_store.insert_data_to_node(data, node_name)
 
     def delete_data(self, id: str):
-        node_name = self._find_closest_next_node_for_key(id)
+        node_name = self._find_closest_next_node_for_hash(self._hash(id))
         self.data_store.delete_by_id_from_node(id, node_name)
 
     def _rebalance_data_on_node_addition(self, node_name):
@@ -122,7 +117,7 @@ class ShardManager:
 
         to_delete = []
         for item in all_data.values.tolist():
-            item_node = self._find_closest_next_node_for_key(item[0])
+            item_node = self._find_closest_next_node_for_hash(self._hash(item[0]))
             if item_node == next_node:
                 continue
             else:
