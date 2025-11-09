@@ -8,10 +8,11 @@ from pandas import DataFrame
 schema = ["id", "data", "created_at"]
 
 class ShardManager:
-    def __init__(self):
+    def __init__(self, max_limit=2**32, virtual_nodes=150):
         self.shards_to_idx = {}
         self.idx_to_shards = {}
-        self.max_limit = 10000
+        self.max_limit = max_limit
+        self.virtual_nodes = virtual_nodes
         self.logger = logging.getLogger(__name__)
 
     def _hash(self, data: str) -> int:
