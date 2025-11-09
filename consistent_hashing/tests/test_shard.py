@@ -199,7 +199,7 @@ def test_read_all_data_missing_file():
     m = ShardManager()
     
     # Reading from non-existent node should return empty DataFrame
-    df = m.data_store.read_all_data("NonExistentNode")
+    df = m.data_store.get_all_data("NonExistentNode")
     assert len(df) == 0
     assert list(df.columns) == ["id", "data", "created_at"]
 

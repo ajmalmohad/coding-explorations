@@ -9,9 +9,6 @@ schema = ["id", "data", "created_at"]
 
 
 class DataStore:
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
-    
     def _get_node_config(self, node_name: str) -> str:
         return node_name if node_name.endswith(".csv") else f"{node_name}.csv"
     
@@ -19,48 +16,48 @@ class DataStore:
         file_path = self._get_node_config(node_name)
         df = pd.DataFrame(columns=schema)
         df.to_csv(file_path, index=False)
-        self.logger.info("Created node file %s", file_path)
+        logging.info("Created node file %s", file_path)
 
     def delete_node(self, node_name: str):
         file_path = self._get_node_config(node_name)
         try:
             os.remove(file_path)
-            self.logger.info("Deleted node file %s", file_path)
+            logging.info("Deleted node file %s", file_path)
         except FileNotFoundError:
-            self.logger.warning("Node file %s not found when attempting delete", file_path)
+            logging.warning("Node file %s not found when attempting delete", file_path)
 
-    def read_all_data(self, node_name: str) -> DataFrame:
+    def get_all_data(self, node_name: str) -> DataFrame:
         file_path = self._get_node_config(node_name)
         try:
             df = pd.read_csv(file_path)
         except FileNotFoundError:
-            self.logger.warning("Reading data from missing node file %s; returning empty DataFrame", file_path)
+            logging.warning("Reading data from missing node file %s; returning empty DataFrame", file_path)
             df = pd.DataFrame(columns=schema)
         return df
 
-    def get_by_id_from_node(self, id: str, node_name: str):
+    def get_by_id(self, id: str, node_name: str):
         file_path = self._get_node_config(node_name)
         df = pd.read_csv(file_path)
         result = df[df['id'] == id]
-        self.logger.info("Lookup id=%s on node=%s returned %d rows", id, node_name, len(result))
+        logging.info("Lookup id=%s on node=%s returned %d rows", id, node_name, len(result))
         return result
-    
-    def insert_data_to_node(self, data: list[str], node_name: str):
+
+    def insert(self, data: list[str], node_name: str):
         file_path = self._get_node_config(node_name)
         df = pd.read_csv(file_path)
         new_row = pd.DataFrame([data], columns=schema)
         df = pd.concat([df, new_row], ignore_index=True)
         df.to_csv(file_path, index=False)
-        self.logger.info("Inserted id=%s into node=%s", data[0], node_name)
+        logging.info("Inserted id=%s into node=%s", data[0], node_name)
 
-    def delete_by_id_from_node(self, id: str, node_name: str):
+    def delete_by_id(self, id: str, node_name: str):
         file_path = self._get_node_config(node_name)
         df = pd.read_csv(file_path)
         before = len(df)
         df = df[df['id'] != id]
         after = len(df)
         df.to_csv(file_path, index=False)
-        self.logger.info("Deleted id=%s from node=%s (rows before=%d after=%d)", id, node_name, before, after)
+        logging.info("Deleted id=%s from node=%s (rows before=%d after=%d)", id, node_name, before, after)
 
 
 class Visualization:
@@ -80,7 +77,7 @@ class Visualization:
             return
         lines = ["Distribution:"]
         for node in sorted(shards_to_idx):
-            df = data_store.read_all_data(node)
+            df = data_store.get_all_data(node)
             count = len(df)
             samples = df['id'].tolist()[:show_samples] if count else []
             lines.append(f"  - node={node} count={count} samples={samples}")
@@ -93,7 +90,6 @@ class ShardManager:
         self.idx_to_shards: dict[int, str] = {}
         self.max_limit = max_limit
         self.virtual_nodes = virtual_nodes
-        self.logger = logging.getLogger(__name__)
         self.data_store = DataStore()
         self.viz = Visualization()
 
@@ -112,13 +108,13 @@ class ShardManager:
         nearest_node_hash = all_indices[nearest_node_idx]
 
         nearest_node = self.idx_to_shards[nearest_node_hash]
-        self.logger.debug("Hash %s -> nearest node %s (hash %s)", hash, nearest_node, nearest_node_hash)
+        logging.debug("Hash %s -> nearest node %s (hash %s)", hash, nearest_node, nearest_node_hash)
         return nearest_node
 
     def get_data(self, id: str):
         node_name = self._find_closest_next_node_for_hash(self._hash(id))
-        self.logger.debug("get_data: id=%s mapped to node=%s", id, node_name)
-        return self.data_store.get_by_id_from_node(id, node_name)
+        logging.debug("get_data: id=%s mapped to node=%s", id, node_name)
+        return self.data_store.get_by_id(id, node_name)
 
     def insert_data(self, data: list[str]):
         if len(data) != len(schema):
@@ -126,20 +122,20 @@ class ShardManager:
         
         id = data[0]
         node_name = self._find_closest_next_node_for_hash(self._hash(id))
-        self.logger.debug("insert_data: id=%s will go to node=%s", id, node_name)
-        self.data_store.insert_data_to_node(data, node_name)
+        logging.debug("insert_data: id=%s will go to node=%s", id, node_name)
+        self.data_store.insert(data, node_name)
 
     def delete_data(self, id: str):
         node_name = self._find_closest_next_node_for_hash(self._hash(id))
-        self.data_store.delete_by_id_from_node(id, node_name)
+        self.data_store.delete_by_id(id, node_name)
 
     def _rebalance_data_on_node_addition(self, node_name):
         new_node_hash = self._hash(node_name)
 
         # find next existing node clockwise: items that used to belong to next_node may need moving
         next_node = self._find_closest_next_node_for_hash((new_node_hash + 1) % self.max_limit)
-        self.logger.info("Rebalancing: new node %s (hash=%s) will pull from %s", node_name, new_node_hash, next_node)
-        all_data = self.data_store.read_all_data(next_node)
+        logging.info("Rebalancing: new node %s (hash=%s) will pull from %s", node_name, new_node_hash, next_node)
+        all_data = self.data_store.get_all_data(next_node)
 
         to_delete = []
         for item in all_data.values.tolist():
@@ -152,17 +148,17 @@ class ShardManager:
                 to_delete.append(item[0])
 
         if to_delete:
-            self.logger.info("Deleting %d rebalanced items from node %s", len(to_delete), next_node)
+            logging.info("Deleting %d rebalanced items from node %s", len(to_delete), next_node)
 
         for item in to_delete:
-            self.data_store.delete_by_id_from_node(item, next_node)
+            self.data_store.delete_by_id(item, next_node)
 
     def _rebalance_data_on_node_removal(self, node_name):
         number_of_nodes = len(self.shards_to_idx)
         if number_of_nodes <= 1:
             raise ValueError(f"There are only {number_of_nodes} nodes present")
 
-        all_data = self.data_store.read_all_data(node_name)
+        all_data = self.data_store.get_all_data(node_name)
         current_node_hash = self._hash(node_name)
 
         # find next existing node clockwise: items needs to move there
@@ -170,14 +166,14 @@ class ShardManager:
 
         to_delete = []
         for item in all_data.values.tolist():
-            self.data_store.insert_data_to_node(item, next_node)
+            self.data_store.insert(item, next_node)
             to_delete.append(item[0])
 
         if to_delete:
-            self.logger.info("Deleting %d rebalanced items from node %s", len(to_delete), node_name)
+            logging.info("Deleting %d rebalanced items from node %s", len(to_delete), node_name)
 
         for item in to_delete:
-            self.data_store.delete_by_id_from_node(item, node_name)
+            self.data_store.delete_by_id(item, node_name)
 
     def add_node(self, node_name: str):
         if node_name in self.shards_to_idx:
@@ -186,7 +182,7 @@ class ShardManager:
         node_hash = self._hash(node_name)
         self.shards_to_idx[node_name] = node_hash
         self.idx_to_shards[node_hash] = node_name
-        self.logger.info("Node %s added with hash %s. Current ring:", node_name, node_hash)
+        logging.info("Node %s added with hash %s. Current ring:", node_name, node_hash)
         self.data_store.create_node(node_name)
         self.visualize_ring()
         self._rebalance_data_on_node_addition(node_name)
@@ -201,7 +197,7 @@ class ShardManager:
         del self.idx_to_shards[node_hash]
         self.data_store.delete_node(node_name)
 
-        self.logger.info("Node %s removed. Current ring:", node_name)
+        logging.info("Node %s removed. Current ring:", node_name)
         self.visualize_ring()
 
     def visualize_ring(self):
@@ -227,3 +223,4 @@ if __name__ == "__main__":
     manager.remove_node("NodeA")
     manager.remove_node("NodeB")
     manager.visualize_distribution()
+    manager.remove_node("NodeC")
