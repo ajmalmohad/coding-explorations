@@ -193,7 +193,7 @@ def test_visualize_distribution_with_data():
         m.insert_data([f"id{i}", f"data{i}", "2025-01-01"])
     
     # Should not raise
-    m.visualize_distribution(show_samples=5)
+    m.visualize_distribution()
 
 def test_read_all_data_missing_file():
     m = ShardManager()

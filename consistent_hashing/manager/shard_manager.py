@@ -7,6 +7,7 @@ from pandas import DataFrame
 
 schema = ["id", "data", "created_at"]
 
+
 class DataStore:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -62,14 +63,39 @@ class DataStore:
         self.logger.info("Deleted id=%s from node=%s (rows before=%d after=%d)", id, node_name, before, after)
 
 
+class Visualization:
+    def visualize_ring(self, shards_to_idx: dict[str, int]):
+        if not shards_to_idx:
+            logging.info("Ring is empty.")
+            return
+        items = sorted((h, n) for n, h in shards_to_idx.items())
+        lines = ["Ring (clockwise):"]
+        for h, n in items:
+            lines.append(f"  - hash={h:5d} -> node={n}")
+        logging.info("\n" + "\n".join(lines))
+
+    def visualize_distribution(self, shards_to_idx: dict[str, int], data_store: DataStore, show_samples: int = 3):
+        if not shards_to_idx:
+            logging.info("No nodes to show distribution for.")
+            return
+        lines = ["Distribution:"]
+        for node in sorted(shards_to_idx):
+            df = data_store.read_all_data(node)
+            count = len(df)
+            samples = df['id'].tolist()[:show_samples] if count else []
+            lines.append(f"  - node={node} count={count} samples={samples}")
+        logging.info("\n" + "\n".join(lines))
+
+
 class ShardManager:
     def __init__(self, max_limit=2**32, virtual_nodes=150):
-        self.shards_to_idx = {}
-        self.idx_to_shards = {}
+        self.shards_to_idx: dict[str, int] = {}
+        self.idx_to_shards: dict[int, str] = {}
         self.max_limit = max_limit
         self.virtual_nodes = virtual_nodes
         self.logger = logging.getLogger(__name__)
         self.data_store = DataStore()
+        self.viz = Visualization()
 
     def _hash(self, data: str) -> int:
         h = hashlib.sha256(data.encode("utf-8")).hexdigest()
@@ -179,26 +205,11 @@ class ShardManager:
         self.visualize_ring()
 
     def visualize_ring(self):
-        if not self.shards_to_idx:
-            self.logger.info("Ring is empty.")
-            return
-        items = sorted((h, n) for n, h in self.shards_to_idx.items())
-        lines = ["Ring (clockwise):"]
-        for h, n in items:
-            lines.append(f"  - hash={h:5d} -> node={n}")
-        self.logger.info("\n" + "\n".join(lines))
+        self.viz.visualize_ring(self.shards_to_idx)
 
-    def visualize_distribution(self, show_samples: int = 3):
-        if not self.shards_to_idx:
-            self.logger.info("No nodes to show distribution for.")
-            return
-        lines = ["Distribution:"]
-        for node in sorted(self.shards_to_idx):
-            df = self.data_store.read_all_data(node)
-            count = len(df)
-            samples = df['id'].tolist()[:show_samples] if count else []
-            lines.append(f"  - node={node} count={count} samples={samples}")
-        self.logger.info("\n" + "\n".join(lines))
+    def visualize_distribution(self):
+        self.viz.visualize_distribution(self.shards_to_idx, self.data_store)
+
 
 if __name__ == "__main__":
     logging.basicConfig(
