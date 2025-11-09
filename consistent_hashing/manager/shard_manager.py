@@ -26,7 +26,7 @@ class DataStore:
         except FileNotFoundError:
             logging.warning("Node file %s not found when attempting delete", file_path)
 
-    def get_all_data(self, node_name: str) -> DataFrame:
+    def get_all(self, node_name: str) -> DataFrame:
         file_path = self._get_node_config(node_name)
         try:
             df = pd.read_csv(file_path)
@@ -77,7 +77,7 @@ class Visualization:
             return
         lines = ["Distribution:"]
         for node in sorted(shards_to_idx):
-            df = data_store.get_all_data(node)
+            df = data_store.get_all(node)
             count = len(df)
             samples = df['id'].tolist()[:show_samples] if count else []
             lines.append(f"  - node={node} count={count} samples={samples}")
@@ -135,7 +135,7 @@ class ShardManager:
         # find next existing node clockwise: items that used to belong to next_node may need moving
         next_node = self._find_closest_next_node_for_hash((new_node_hash + 1) % self.max_limit)
         logging.info("Rebalancing: new node %s (hash=%s) will pull from %s", node_name, new_node_hash, next_node)
-        all_data = self.data_store.get_all_data(next_node)
+        all_data = self.data_store.get_all(next_node)
 
         to_delete = []
         for item in all_data.values.tolist():
@@ -158,7 +158,7 @@ class ShardManager:
         if number_of_nodes <= 1:
             raise ValueError(f"There are only {number_of_nodes} nodes present")
 
-        all_data = self.data_store.get_all_data(node_name)
+        all_data = self.data_store.get_all(node_name)
         current_node_hash = self._hash(node_name)
 
         # find next existing node clockwise: items needs to move there
