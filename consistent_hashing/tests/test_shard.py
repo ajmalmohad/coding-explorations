@@ -20,10 +20,14 @@ def test_add_node_creates_shard():
     m = ShardManager()
     m.add_node("NodeA")
     
-    assert "NodeA" in m.shards_to_idx
+    # Check physical node exists in virtual_to_physical mapping
+    physical_nodes = set(m.virtual_to_physical.values())
+    assert "NodeA" in physical_nodes
     assert os.path.exists("NodeA.csv")
-    assert isinstance(m.shards_to_idx["NodeA"], int)
-    assert 0 <= m.shards_to_idx["NodeA"] < m.max_limit
+    
+    # Verify virtual nodes were created
+    virtual_nodes = [v for v, p in m.virtual_to_physical.items() if p == "NodeA"]
+    assert len(virtual_nodes) == m.virtual_nodes
 
 def test_add_duplicate_node_raises_error():
     m = ShardManager()
@@ -40,7 +44,8 @@ def test_remove_node_deletes_shard():
     assert os.path.exists("NodeA.csv")
     m.remove_node("NodeA")
     
-    assert "NodeA" not in m.shards_to_idx
+    # Check no virtual nodes remain for NodeA
+    assert "NodeA" not in m.virtual_to_physical.values()
     assert not os.path.exists("NodeA.csv")
 
 def test_remove_nonexistent_node_raises_error():
@@ -150,15 +155,18 @@ def test_data_distributes_across_nodes():
     for k in ids:
         m.insert_data([k, f"payload-{k}", "2025-01-01"])
     
+    # Get physical node names
+    physical_nodes = set(m.virtual_to_physical.values())
+    
     # Verify all data is stored
     all_stored_ids = set()
-    for node in m.shards_to_idx.keys():
+    for node in physical_nodes:
         all_stored_ids.update(read_ids_for_node(node))
     
     assert set(ids) == all_stored_ids
     
     # Verify data is distributed (at least 2 nodes should have data)
-    nodes_with_data = sum(1 for node in m.shards_to_idx.keys() if len(read_ids_for_node(node)) > 0)
+    nodes_with_data = sum(1 for node in physical_nodes if len(read_ids_for_node(node)) > 0)
     assert nodes_with_data >= 2
 
 def test_rebalance_on_node_addition():
@@ -175,8 +183,9 @@ def test_rebalance_on_node_addition():
     m.add_node("NodeB")
     
     # Data should be redistributed
+    physical_nodes = set(m.virtual_to_physical.values())
     all_stored_ids = set()
-    for node in m.shards_to_idx.keys():
+    for node in physical_nodes:
         node_ids = read_ids_for_node(node)
         all_stored_ids.update(node_ids)
         
@@ -199,12 +208,13 @@ def test_rebalance_on_node_removal():
     m.remove_node("NodeB")
     
     # All data should still exist on remaining nodes
+    physical_nodes = set(m.virtual_to_physical.values())
     all_stored_ids = set()
-    for node in m.shards_to_idx.keys():
+    for node in physical_nodes:
         all_stored_ids.update(read_ids_for_node(node))
     
     assert set(ids) == all_stored_ids
-    assert "NodeB" not in m.shards_to_idx
+    assert "NodeB" not in physical_nodes
 
 def test_multiple_rebalancing_operations():
     m = ShardManager()
@@ -224,12 +234,13 @@ def test_multiple_rebalancing_operations():
     m.remove_node("Node4")
     
     # Verify all data still exists
+    physical_nodes = set(m.virtual_to_physical.values())
     all_stored_ids = set()
-    for node in m.shards_to_idx.keys():
+    for node in physical_nodes:
         all_stored_ids.update(read_ids_for_node(node))
     
     assert set(ids) == all_stored_ids
-    assert len(m.shards_to_idx) == 2
+    assert len(physical_nodes) == 2
 
 def test_consistent_mapping_after_rebalance():
     m = ShardManager()
