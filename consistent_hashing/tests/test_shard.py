@@ -55,7 +55,7 @@ def test_rebalance_on_addition_moves_items():
     m.add_node("NodeB")
     # After rebalance, each id should be stored on the node that maps to it
     for k in ids:
-        expected_node = m._find_closest_next_node_for_hash(m._hash(k))
+        expected_node = m._find_node_for_hash(m._hash(k))
         stored_ids = set(read_ids_for_node(expected_node))
         assert k in stored_ids, f"{k} not found in expected node {expected_node}"
 
@@ -74,7 +74,7 @@ def test_rebalance_on_removal_moves_items_and_deletes_file():
     assert not os.path.exists("NodeB.csv")
 
     for k in ids:
-        expected = m._find_closest_next_node_for_hash(m._hash(k))
+        expected = m._find_node_for_hash(m._hash(k))
         stored_ids = set(read_ids_for_node(expected))
         assert k in stored_ids, f"{k} missing from {expected}"
 
@@ -263,15 +263,3 @@ def test_sequential_add_remove_stability():
         all_stored_ids.update(read_ids_for_node(node))
     
     assert set(ids) == all_stored_ids
-
-def test_idx_to_shards_consistency():
-    m = ShardManager()
-    m.add_node("NodeA")
-    m.add_node("NodeB")
-    
-    # Verify bidirectional mapping consistency
-    for node_name, hash_val in m.shards_to_idx.items():
-        assert m.idx_to_shards[hash_val] == node_name
-    
-    for hash_val, node_name in m.idx_to_shards.items():
-        assert m.shards_to_idx[node_name] == hash_val
