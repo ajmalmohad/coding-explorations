@@ -31,13 +31,11 @@ class ShardManager:
 
     def get_data(self, id: str):
         node_name = self._find_node_for_hash(self._hash(id))
-        logging.debug("get_data: id=%s mapped to node=%s", id, node_name)
         return self.data_store.get_by_id(id, node_name)
 
     def insert_data(self, data: list[str]):
         id = data[0]
         node_name = self._find_node_for_hash(self._hash(id))
-        logging.debug("insert_data: id=%s will go to node=%s", id, node_name)
         self.data_store.insert(data, node_name)
 
     def delete_data(self, id: str):
@@ -45,11 +43,7 @@ class ShardManager:
         self.data_store.delete_by_id(id, node_name)
 
     def _rebalance_data_on_node_addition(self, node_name):
-        existing_nodes = [p for p in set(self.virtual_to_physical.values()) if p != node_name]
-        
-        logging.info("Rebalancing: checking nodes %s for data that should move to %s", 
-                    existing_nodes, node_name)
-        
+        existing_nodes = [p for p in set(self.virtual_to_physical.values()) if p != node_name]        
         for existing_node in existing_nodes:
             all_data = self.data_store.get_all(existing_node)
             for item in all_data.values.tolist():
@@ -62,7 +56,6 @@ class ShardManager:
     def _rebalance_data_on_node_removal(self, node_name):
         all_data = self.data_store.get_all(node_name)
         next_node = self._find_node_for_hash((self._hash(node_name) + 1) % self.max_limit)
-        
         for item in all_data.values.tolist():
             self.data_store.insert(item, next_node)
             self.data_store.delete_by_id(item[0], node_name)
@@ -77,7 +70,6 @@ class ShardManager:
             self.shards_to_idx[virtual_name] = virtual_hash
             self.virtual_to_physical[virtual_name] = node_name
 
-        logging.info("Node %s added with %d virtual nodes", node_name, self.virtual_nodes)
         self.data_store.create_node(node_name)
         self.visualize_ring()
         self._rebalance_data_on_node_addition(node_name)
@@ -95,9 +87,7 @@ class ShardManager:
             del self.virtual_to_physical[v_node]
 
         self._rebalance_data_on_node_removal(node_name)
-
         self.data_store.delete_node(node_name)
-        logging.info("Node %s removed. Current ring:", node_name)
         self.visualize_ring()
 
     def visualize_ring(self):
