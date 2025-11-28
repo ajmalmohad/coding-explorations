@@ -1,6 +1,5 @@
 import bisect
 import hashlib
-import logging
 
 from consistent_hashing.manager.data_store import DataStore
 from consistent_hashing.manager.visualization import Visualization
