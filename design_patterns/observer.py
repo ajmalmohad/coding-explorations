@@ -6,7 +6,7 @@ class Observer(ABC):
         pass
 
 
-class Subject(ABC):
+class Observable(ABC):
     @abstractmethod
     def attach(self, observer: Observer):
         pass
@@ -33,7 +33,7 @@ class LoggingDisplay(Display):
 
 
 class SubscriberA(Observer, LoggingDisplay):
-    def __init__(self, subject: Subject) -> None:
+    def __init__(self, subject: Observable) -> None:
         self.subject = subject
         self.data = {}
         subject.attach(self)
@@ -50,7 +50,7 @@ class SubscriberA(Observer, LoggingDisplay):
 
 
 class SubscriberB(Observer, LoggingDisplay):
-    def __init__(self, subject: Subject) -> None:
+    def __init__(self, subject: Observable) -> None:
         self.subject = subject
         self.data = {}
         subject.attach(self)
@@ -66,7 +66,7 @@ class SubscriberB(Observer, LoggingDisplay):
         self.subject.detach(self)
 
 
-class PublisherA(Subject):
+class PublisherA(Observable):
     def __init__(self) -> None:
         self.subscribers: list[Observer] = []
         self.value: int = 0
