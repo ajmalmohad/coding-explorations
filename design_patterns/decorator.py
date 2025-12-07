@@ -72,3 +72,6 @@ whip_mocha_espresso = Whip(mocha_espresso)
 print(espresso.get_description(), ":", espresso.get_cost())
 print(mocha_espresso.get_description(), ":", mocha_espresso.get_cost())
 print(whip_mocha_espresso.get_description(), ":", whip_mocha_espresso.get_cost())
+
+drink = Mocha(Whip(Mocha(HouseBlend())))
+print(drink.get_description(), ":", drink.get_cost())
